@@ -1,8 +1,7 @@
 
 #-  Copyright 2023 Robert Belles MIT license -#
-
+import json
 class EMPORIA : Driver
-    import json
     var wire          #- if wire == nil then the module is not initialized -#
     var raw_data
     var parsed_data
