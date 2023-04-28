@@ -2,6 +2,7 @@
 #-  Copyright 2023 Robert Belles MIT license -#
 
 class EMPORIA : Driver
+    import json
     var wire          #- if wire == nil then the module is not initialized -#
     var raw_data
     var parsed_data
@@ -96,7 +97,7 @@ class EMPORIA : Driver
             probe += 1
         end
         self.parsed_data.insert('eom', self.raw_data.get(0x11a,2)) #- endofmessage-#
-        return self.parsed_data
+        #- return self.parsed_data -#
     end
 
 
@@ -123,7 +124,8 @@ class EMPORIA : Driver
     def json_append()
         if !self.wire return nil end  #- exit if not initialized -#
         self.calculate_values()
-        var msg = "\"EMPORIA\":" .. self.parsed_data.tostring()
+        #- var msg = "\"EMPORIA\":" .. self.parsed_data.tostring() -#
+        var msg = ',"EMPORIA":' + json.dump(self.parsed_data)
         tasmota.response_append(msg)
     end
 end #- end class -#
