@@ -1,8 +1,11 @@
 
 #-  Copyright 2023 Robert Belles MIT license -#
+#- version 1.0.0 -#
+
 import json
 class EMPORIA : Driver
-    var wire          #- if wire == nil then the module is not initialized -#
+    var driver_version
+    var wire         
     var raw_data
     var parsed_data
     var P_correction
@@ -18,7 +21,8 @@ class EMPORIA : Driver
         if self.wire
             var v = self.wire.read(0x64,0x02,1)
             if v != 0x52 return end  #- wrong device -#
-            self.register_commands()
+            self.register_commands() #- register tasmota commands -#
+            self.driver_version  = "1.0.0"
             self.raw_data = bytes()
             self.parsed_data = map()
             self.P_correction = 0.022 #- Power Calibration -#
@@ -50,53 +54,48 @@ class EMPORIA : Driver
     def read_emporia()
         if !self.wire return nil end  #- exit if not initialized -#
         self.raw_data.clear()
-        var i = 0
-        while i < 3
-            self.raw_data .. self.wire.read_bytes(0x64, 0x00 + (i * 96), 96)
-            i += 1
+        for i: 0..2
+             self.raw_data .. self.wire.read_bytes(0x64, (i * 96), 96)
         end
-        return self.raw_data
+        #return self.raw_data
     end
 
     def calculate_values()
         if !self.wire return nil end  #- exit if not initialized -#
-        var probe = 0
-        self.parsed_data.insert('is_unread', self.raw_data.get(0x00,1))
-        self.parsed_data.insert('checksum', self.raw_data.get(0x01,1))
-        self.parsed_data.insert('unknown', self.raw_data.get(0x02,1))
-        self.parsed_data.insert('sequence', self.raw_data.get(0x03,1))
+        self.parsed_data.setitem('is_unread', self.raw_data.get(0x00,1))
+        self.parsed_data.setitem('checksum', self.raw_data.get(0x01,1))
+        self.parsed_data.setitem('unknown', self.raw_data.get(0x02,1))
+        self.parsed_data.setitem('sequence', self.raw_data.get(0x03,1))
 
-        while probe < 19
-            if probe <= 3
-                self.parsed_data.insert('P' + str(probe) + '_black', self.raw_data.geti((probe * 0x0c) + 0x04,4) * self.P_correction / self.ct_correction_factor_mains)  #- probe * 0x0c + 0x04   -#
-                self.parsed_data.insert('P' + str(probe) + '_red', self.raw_data.geti((probe * 0x0c) + 0x08,4) * self.P_correction / self.ct_correction_factor_mains)    #- probe * 0x0c + 0x08   -#
-                self.parsed_data.insert('P' + str(probe) + '_blue', self.raw_data.geti((probe * 0x0c) + 0x0c,4) * self.P_correction / self.ct_correction_factor_mains)   #- probe * 0x0c + 0x0c   -#
+        for i: 0..18
+            if i <= 3
+                self.parsed_data.setitem('P' + str(i) + '_black', self.raw_data.geti((i * 0x0c) + 0x04,4) * self.P_correction / self.ct_correction_factor_mains)  #- probe * 0x0c + 0x04   -#
+                self.parsed_data.setitem('P' + str(i) + '_red', self.raw_data.geti((i * 0x0c) + 0x08,4) * self.P_correction / self.ct_correction_factor_mains)    #- probe * 0x0c + 0x08   -#
+                self.parsed_data.setitem('P' + str(i) + '_blue', self.raw_data.geti((i * 0x0c) + 0x0c,4) * self.P_correction / self.ct_correction_factor_mains)   #- probe * 0x0c + 0x0c   -#
             else
-                self.parsed_data.insert('P' + str(probe) + '_black', self.raw_data.geti((probe * 0x0c) + 0x04,4) * self.P_correction / self.ct_correction_factor_probe)  #- probe * 0x0c + 0x04   -#
-                self.parsed_data.insert('P' + str(probe) + '_red', self.raw_data.geti((probe * 0x0c) + 0x08,4) * self.P_correction / self.ct_correction_factor_probe)    #- probe * 0x0c + 0x08   -#
-                self.parsed_data.insert('P' + str(probe) + '_blue', self.raw_data.geti((probe * 0x0c) + 0x0c,4) * self.P_correction / self.ct_correction_factor_probe)   #- probe * 0x0c + 0x0c   -#
+                self.parsed_data.setitem('P' + str(i) + '_black', self.raw_data.geti((i * 0x0c) + 0x04,4) * self.P_correction / self.ct_correction_factor_probe)  #- probe * 0x0c + 0x04   -#
+                self.parsed_data.setitem('P' + str(i) + '_red', self.raw_data.geti((i * 0x0c) + 0x08,4) * self.P_correction / self.ct_correction_factor_probe)    #- probe * 0x0c + 0x08   -#
+                self.parsed_data.setitem('P' + str(i) + '_blue', self.raw_data.geti((i * 0x0c) + 0x0c,4) * self.P_correction / self.ct_correction_factor_probe)   #- probe * 0x0c + 0x0c   -#
             end
-            probe += 1
         end
 
-        self.parsed_data.insert('V_black', self.raw_data.get(0xe8,2) * self.V_black_correction)  
-        self.parsed_data.insert('V_red', self.raw_data.get(0xea,2) * self.V_red_correction)  
-        self.parsed_data.insert('V_blue', self.raw_data.get(0xec,2) * self.V_blue_correction)  
-        self.parsed_data.insert('frequency', self.freq_correction / self.raw_data.get(0xee,2))  
-        self.parsed_data.insert('PhaseAngle_red', (self.raw_data.get(0xf0,2) * 360) / self.raw_data.get(0xee,2)) 
-        self.parsed_data.insert('PhaseAngle_blue', (self.raw_data.get(0xf2,2) * 360) / self.raw_data.get(0xee,2)) 
+        self.parsed_data.setitem('V_black', self.raw_data.get(0xe8,2) * self.V_black_correction)  
+        self.parsed_data.setitem('V_red', self.raw_data.get(0xea,2) * self.V_red_correction)  
+        self.parsed_data.setitem('V_blue', self.raw_data.get(0xec,2) * self.V_blue_correction)  
+        self.parsed_data.setitem('frequency', self.freq_correction / self.raw_data.get(0xee,2))  
+        self.parsed_data.setitem('PhaseAngle_red', (self.raw_data.get(0xf0,2) * 360) / self.raw_data.get(0xee,2)) 
+        self.parsed_data.setitem('PhaseAngle_blue', (self.raw_data.get(0xf2,2) * 360) / self.raw_data.get(0xee,2)) 
 
-        probe = 0
-        while probe < 19
-            if probe <= 3
-                self.parsed_data.insert('I_' + str(probe), self.raw_data.get((probe * 0x02) + 0xf4,2) * self.I_correction_mains)
+        for i: 0..18
+            if i <= 3
+                self.parsed_data.setitem('I_' + str(i), self.raw_data.get((i * 0x02) + 0xf4,2) * self.I_correction_mains)
             else
-                self.parsed_data.insert('I_' + str(probe), self.raw_data.get((probe * 0x02) + 0xf4,2) * self.I_correction_probe )
+                self.parsed_data.setitem('I_' + str(i), self.raw_data.get((i * 0x02) + 0xf4,2) * self.I_correction_probe )
             end  
-            probe += 1
         end
-        self.parsed_data.insert('eom', self.raw_data.get(0x11a,2)) #- endofmessage-#
-        #- return self.parsed_data -#
+        self.parsed_data.setitem('eom', self.raw_data.get(0x11a,2)) #- endofmessage-#
+        #self.parsed_data.setitem('driver_version', self.driver_version)
+     
     end
 
 
@@ -113,17 +112,18 @@ class EMPORIA : Driver
         var msg = string.format(
                 "{s}V_black{m}%.3f V{e}"..
                 "{s}Frequency{m}%.2f Hz{e}"..
-                "{s}I_A{m}%.3f A{e}",
+                "{s}I_A{m}%.3f A{e}"..
+                "{s}driver version{m}%s{e}",
                 self.parsed_data['V_black'], 
                 self.parsed_data['frequency'],
-                self.parsed_data['I_0'])
+                self.parsed_data['I_0'],
+                self.driver_version)
         tasmota.web_send_decimal(msg)
     end 
     #- add sensor value to teleperiod -#
     def json_append()
         if !self.wire return nil end  #- exit if not initialized -#
         self.calculate_values()
-        #- var msg = "\"EMPORIA\":" .. self.parsed_data.tostring() -#
         var msg = ',"EMPORIA":' + json.dump(self.parsed_data)
         tasmota.response_append(msg)
     end
