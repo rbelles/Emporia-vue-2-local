@@ -46,6 +46,7 @@ class EMPORIA : Driver
                 tasmota.remove_driver(self)
                 tasmota.remove_cmd('UnloadEmporia')
                 tasmota.resp_cmnd_done()
+                log('Driver unloaded')
             end )
 
     end
